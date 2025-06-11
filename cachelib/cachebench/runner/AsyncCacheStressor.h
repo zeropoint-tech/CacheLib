@@ -201,7 +201,7 @@ class AsyncCacheStressor : public Stressor {
 
  private:
   static std::string genHardcodedString() {
-    const std::string s = "The quick brown fox jumps over the lazy dog. ";
+    const std::string s = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     std::string val;
     for (int i = 0; i < 4 * 1024 * 1024; i += s.size()) {
       val += s;

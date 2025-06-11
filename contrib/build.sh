@@ -160,16 +160,16 @@ test -n "$skip_build" \
 DETECTED=
 detect_os
 
-if test -z "$skip_os_pkgs" ; then
+if test -z "$skip_os_pkgs"; then
   case "$DETECTED" in
-    debian10|debian11) build_debian_10 ;;
-    ubuntu18.04|ubuntu20.04|ubuntu21.04|ubuntu22.04) build_ubuntu_18 ;;
-    centos8|rocky8.?) build_centos_8 ;;
-    centos9) build_centos_9 ;;
-    rocky9.?) build_rocky_9 ;;
-    fedora3[456]) build_fedora_34 ;;
-    arch*|manjaro*) build_arch ;;
-    *) die "No build recipe for detected operating system '$DETECTED'" ;;
+  debian10 | debian11) build_debian_10 ;;
+  ubuntu18.04 | ubuntu20.04 | ubuntu21.04 | ubuntu22.04 | ubuntu24.04 | ubuntu25.04) build_ubuntu_18 ;;
+  centos8 | rocky8.*) build_centos_8 ;;
+  centos9) build_centos_9 ;;
+  rocky9.? | almalinux9.6) build_rocky_9 ;;
+  fedora3[456]) build_fedora_34 ;;
+  arch* | manjaro*) build_arch ;;
+  *) die "No build recipe for detected operating system '$DETECTED'" ;;
   esac
 fi
 

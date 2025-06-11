@@ -246,6 +246,13 @@ struct StressorConfig : public JSONConfig {
   std::string traceFileName{};
   std::vector<std::string> traceFileNames{};
 
+  // Mem dump as data source. This is secondary to using a trace file as
+  // data source, meaning that this option has no effect if a trace file is
+  // supplied in the config. Setting `memDumpSequential` will read the memdump
+  // from start to finish (default), while unsetting will read randomly.
+  std::string memDumpFileName{};
+  bool memDumpSequential{true};
+
   // location of the path for the files referenced inside the json. If not
   // specified, it defaults to the path of the json file being parsed.
   std::string configPath{};

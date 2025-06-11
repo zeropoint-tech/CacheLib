@@ -224,7 +224,7 @@ class CacheStressor : public Stressor {
 
  private:
   static std::string genHardcodedString() {
-    const std::string s = "The quick brown fox jumps over the lazy dog. ";
+    const std::string s = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     std::string val;
     for (int i = 0; i < 4 * 1024 * 1024; i += s.size()) {
       val += s;
@@ -248,6 +248,42 @@ class CacheStressor : public Stressor {
     return lockEnabled_ ? Lock{getLock(key)} : Lock{};
   }
 
+  std::string getNextMemDumpChunk() {
+    std::string fileName = config_.memDumpFileName;
+    size_t chunkSize = 4 * 1024; // 4KB
+
+    folly::File f(folly::openNoInt(fileName.c_str(), O_RDONLY), true);
+    size_t size = size_t(lseek(f.fd(), 0, SEEK_END));
+    if (size == 0) {
+      return {};
+    }
+    size_t _readOffset = 0;
+    size_t toRead = std::min(chunkSize, size);
+
+    if (config_.memDumpSequential) {
+      if (readOffset_ >= size) {
+        return {};
+      }
+      _readOffset = readOffset_;
+      toRead = std::min(chunkSize, size - readOffset_);
+      readOffset_ += toRead;
+    } else {
+      if (size <= chunkSize) {
+        _readOffset = 0;
+        toRead = size;
+      } else {
+        _readOffset = folly::Random::rand64() % (size - chunkSize + 1);
+        toRead = chunkSize;
+      }
+    }
+
+    std::unique_ptr<char[]> buf(new char[toRead]);
+    auto bytes_read = folly::preadFull(f.fd(), buf.get(), toRead, _readOffset);
+    PCHECK(ssize_t(toRead) == bytes_read);
+
+    return std::string(buf.get(), toRead);
+  }
+
   // populate the input item handle according to the stress setup.
   void populateItem(WriteHandle& handle, const std::string& itemValue = "") {
     if (!config_.populateItem) {
@@ -261,6 +297,8 @@ class CacheStressor : public Stressor {
 
     if (!itemValue.empty()) {
       cache_->setStringItem(handle, itemValue);
+    } else if (!config_.memDumpFileName.empty()) {
+      cache_->setStringItem(handle, getNextMemDumpChunk());
     } else {
       cache_->setStringItem(handle, hardcodedString_);
     }
@@ -303,7 +341,7 @@ class CacheStressor : public Stressor {
       try {
         // at the end of every operation, throttle per the config.
         SCOPE_EXIT { throttleFn(); };
-          // detect refcount leaks when run in  debug mode.
+        // detect refcount leaks when run in  debug mode.
 #ifndef NDEBUG
         auto checkCnt = [useCombinedLockForIterators =
                              config_.useCombinedLockForIterators](int cnt) {
@@ -591,6 +629,8 @@ class CacheStressor : public Stressor {
 
   // Whether flash cache has been warmed up
   bool hasNvmCacheWarmedUp_{false};
+
+  off_t readOffset_; // for incremental reading
 };
 } // namespace cachebench
 } // namespace cachelib
