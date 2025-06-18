@@ -252,9 +252,18 @@ class CacheStressor : public Stressor {
     std::string fileName = config_.memDumpFileName;
     size_t chunkSize = 4 * 1024; // 4KB
 
-    folly::File f(folly::openNoInt(fileName.c_str(), O_RDONLY), true);
-    size_t size = size_t(lseek(f.fd(), 0, SEEK_END));
+    if (!file_) {
+      folly::File file(folly::openNoInt(fileName.c_str(), O_RDONLY), false);
+      if (!file) {
+        LOG(ERROR) << "Failed to open file: " << fileName;
+        return {};
+      }
+      file_ = std::move(file);
+    }
+
+    size_t size = size_t(lseek(file_.fd(), 0, SEEK_END));
     if (size == 0) {
+      LOG(WARNING) << "File is empty: " << fileName;
       return {};
     }
     size_t _readOffset = 0;
@@ -262,23 +271,21 @@ class CacheStressor : public Stressor {
 
     if (config_.memDumpSequential) {
       if (readOffset_ >= size) {
-        return {};
+        readOffset_ = 0;
       }
       _readOffset = readOffset_;
       toRead = std::min(chunkSize, size - readOffset_);
       readOffset_ += toRead;
     } else {
-      if (size <= chunkSize) {
-        _readOffset = 0;
-        toRead = size;
-      } else {
+      // Keep offset at 0 if we can't read beyond the file's size
+      if (size > chunkSize) {
         _readOffset = folly::Random::rand64() % (size - chunkSize + 1);
-        toRead = chunkSize;
       }
     }
 
     std::unique_ptr<char[]> buf(new char[toRead]);
-    auto bytes_read = folly::preadFull(f.fd(), buf.get(), toRead, _readOffset);
+    auto bytes_read =
+        folly::preadFull(file_.fd(), buf.get(), toRead, _readOffset);
     PCHECK(ssize_t(toRead) == bytes_read);
 
     return std::string(buf.get(), toRead);
@@ -630,7 +637,9 @@ class CacheStressor : public Stressor {
   // Whether flash cache has been warmed up
   bool hasNvmCacheWarmedUp_{false};
 
-  off_t readOffset_; // for incremental reading
+  // For continuous reading of memory dump file
+  folly::File file_;
+  off_t readOffset_;
 };
 } // namespace cachebench
 } // namespace cachelib
