@@ -129,6 +129,10 @@ class CacheStressor : public Stressor {
                                     ? config_.opRateBurstSize
                                     : config_.opRatePerSec);
     }
+
+    if (!config_.memDumpFileName.empty()) {
+      file_ = folly::File(config_.memDumpFileName.c_str(), O_RDONLY, true);
+    }
   }
 
   ~CacheStressor() override { finish(); }
@@ -253,12 +257,8 @@ class CacheStressor : public Stressor {
     size_t chunkSize = 4 * 1024; // 4KB
 
     if (!file_) {
-      folly::File file(folly::openNoInt(fileName.c_str(), O_RDONLY), false);
-      if (!file) {
-        LOG(ERROR) << "Failed to open file: " << fileName;
-        return {};
-      }
-      file_ = std::move(file);
+      LOG(ERROR) << "Failed to open file: " << fileName;
+      return {};
     }
 
     size_t size = size_t(lseek(file_.fd(), 0, SEEK_END));
@@ -639,7 +639,7 @@ class CacheStressor : public Stressor {
 
   // For continuous reading of memory dump file
   folly::File file_;
-  off_t readOffset_;
+  off_t readOffset_{0};
 };
 } // namespace cachebench
 } // namespace cachelib
